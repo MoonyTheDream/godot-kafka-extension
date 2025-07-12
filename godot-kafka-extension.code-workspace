@@ -5,8 +5,8 @@
 		}
 	],
 	"settings": {
-		"godotTools.editorPath.godot4": "/home/moony/snap/steam/common/.local/share/Steam/steamapps/common/Godot Engine/godot.x11.opt.tools.64",
+		"godotTools.editorPath.godot4": "/home/moony/Godot/Godot_v4.4.1-stable_linux.x86_64",
 		// "godotTools.editorPath.godot4": "/home/moony/godot/Godot_v4.3-stable_linux.arm64"
 		// "godotTools.editorPath.godot4": "/home/moony/.local/share/Steam/steamapps/common/Godot Engine/godot.x11.opt.tools.64"
 	},
-}
+}	

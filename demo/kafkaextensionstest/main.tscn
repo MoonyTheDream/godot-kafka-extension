@@ -1,0 +1,16 @@
+[gd_scene load_steps=2 format=3 uid="uid://cay7cx4pw4v8y"]
+
+[ext_resource type="Script" uid="uid://n8c31w131feh" path="res://kafka.gd" id="1_ig7tw"]
+
+[node name="Main" type="Node"]
+script = ExtResource("1_ig7tw")
+
+[node name="Node2D" type="Node2D" parent="."]
+
+[node name="Camera2D" type="Camera2D" parent="Node2D"]
+anchor_mode = 0
+
+[node name="TextEdit" type="TextEdit" parent="Node2D"]
+offset_right = 1150.0
+offset_bottom = 633.0
+text = "Hehehehe"
