@@ -25,6 +25,8 @@ void KafkaProducer::set_bootstrap_servers(const String &servers) {
 }
 void KafkaProducer::set_topic(const String &t) {
     topic = t.utf8().get_data();
+    print_line("KafkaProducer topic is set to: " + String(topic.c_str()));
+
 }
 
 void KafkaProducer::send_message(const String &message) {

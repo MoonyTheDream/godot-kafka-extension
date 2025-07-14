@@ -19,6 +19,8 @@ class KafkaConsumer : public RefCounted {
 private:
     std::string brokers;
     std::string topic;
+    std::string pending_topic;
+    bool topic_changed = false;
     std::atomic<bool> running;
     std::thread consumer_thread;
     std::queue<String> message_queue;
@@ -31,6 +33,7 @@ public:
 
     void set_bootstrap_servers(const String &servers);
     void set_topic(const String &topic);
+    void change_topic(const String &new_topic);
     void start();
     void stop();
     bool has_message();

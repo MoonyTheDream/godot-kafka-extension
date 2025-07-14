@@ -8,6 +8,8 @@ void KafkaConsumer::_bind_methods() {
                          &KafkaConsumer::set_bootstrap_servers);
     ClassDB::bind_method(D_METHOD("set_topic", "topic"),
                          &KafkaConsumer::set_topic);
+    ClassDB::bind_method(D_METHOD("change_topic", "new_topic"),
+                         &KafkaConsumer::change_topic);
     ClassDB::bind_method(D_METHOD("start"),
                          &KafkaConsumer::start);
     ClassDB::bind_method(D_METHOD("stop"),
@@ -16,6 +18,8 @@ void KafkaConsumer::_bind_methods() {
                          &KafkaConsumer::has_message);
     ClassDB::bind_method(D_METHOD("get_message"),
                          &KafkaConsumer::get_message);
+
+    ADD_SIGNAL(MethodInfo("consumer_ready"));
 }
 
 KafkaConsumer::KafkaConsumer() : running(false) { }
@@ -28,6 +32,12 @@ void KafkaConsumer::set_bootstrap_servers(const String &servers) {
 }
 void KafkaConsumer::set_topic(const String &t) {
     topic = t.utf8().get_data();
+}
+
+void KafkaConsumer::change_topic(const String &new_topic) {
+    std::lock_guard<std::mutex> lock(queue_mutex);
+    pending_topic = new_topic.utf8().get_data();
+    topic_changed = true;
 }
 
 void KafkaConsumer::start() {
@@ -62,21 +72,30 @@ String KafkaConsumer::get_message() {
 }
 
 void KafkaConsumer::_consume_loop() {
-    // Prepare Kafka consumer configuration
     kafka::Properties props({ {"bootstrap.servers", {brokers}} });
-    // (By default enable.auto.commit=true)
     kafka::clients::consumer::KafkaConsumer consumer(props);
 
-    // Subscribe to the topic
     consumer.subscribe({ topic });
 
+    call_deferred("emit_signal", "consumer_ready");
+    print_line("KafkaConsumer starting _consume_loop on topic: " + String(topic.c_str()));
+
     while (running) {
-        // Poll for new records (timeout 10ms)
+        if (topic_changed) {
+            consumer.unsubscribe();
+            consumer.subscribe({ pending_topic });
+            topic = pending_topic;
+            call_deferred("emit_signal", "consumer_ready");
+            topic_changed = false;
+            print_line("KafkaConsumer switched to topic: " + String(topic.c_str()));
+        }
+
         auto records = consumer.poll(std::chrono::milliseconds(10));
         for (const auto &record : records) {
             if (!record.error()) {
-                // Push the message value onto the queue
-                String value = String(record.value().toString().c_str());
+                std::string raw_value = record.value().toString();
+                String value = String::utf8(raw_value.data(), raw_value.size());
+                
                 std::lock_guard<std::mutex> lock(queue_mutex);
                 message_queue.push(value);
             }
@@ -84,3 +103,4 @@ void KafkaConsumer::_consume_loop() {
     }
     consumer.close();
 }
+
