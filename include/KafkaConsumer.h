@@ -36,6 +36,7 @@ public:
     void change_topic(const String &new_topic);
     void start();
     void stop();
+    bool is_running();
     bool has_message();
     String get_message();
 
