@@ -33,6 +33,8 @@ void KafkaProducer::send_message(const String &message) {
     if (!producer) {
         kafka::Properties props;
         props.put("bootstrap.servers", brokers);
+        props.put("linger.ms", "0");
+
         producer = std::make_unique<kafka::clients::producer::KafkaProducer>(props);
     }
 

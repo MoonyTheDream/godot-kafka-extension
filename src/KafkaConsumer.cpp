@@ -79,10 +79,15 @@ String KafkaConsumer::get_message() {
 
 void KafkaConsumer::_consume_loop() {
     kafka::Properties props({ {"bootstrap.servers", {brokers}} });
+    // props.put("fetch.min.bytes", "1");
+    // props.put("fetch.wait.max.ms", "10");
+
     kafka::clients::consumer::KafkaConsumer consumer(props);
 
     consumer.subscribe({ topic });
 
+    // Let's wait additional 10ms
+    std::this_thread::sleep_for(std::chrono::milliseconds(150));
     call_deferred("emit_signal", "consumer_ready");
     print_line("KafkaConsumer starting _consume_loop on topic: " + String(topic.c_str()));
     running = true;
@@ -93,6 +98,7 @@ void KafkaConsumer::_consume_loop() {
             consumer.unsubscribe();
             consumer.subscribe({ pending_topic });
             topic = pending_topic;
+            std::this_thread::sleep_for(std::chrono::milliseconds(150));
             topic_changed = false;
             call_deferred("emit_signal", "consumer_ready");
             print_line("KafkaConsumer switched to topic: " + String(topic.c_str()));
@@ -102,9 +108,11 @@ void KafkaConsumer::_consume_loop() {
         auto records = consumer.poll(std::chrono::milliseconds(10));
         for (const auto &record : records) {
             if (!record.error()) {
-                std::string raw_value = record.value().toString();
-                String value = String::utf8(raw_value.data(), raw_value.size());
-                
+                const auto value_view = record.value();  // kafka::Value is a ByteArray-like view
+
+                const char* raw_ptr = static_cast<const char*>(value_view.data());
+                String value = String::utf8(raw_ptr, value_view.size());
+
                 std::lock_guard<std::mutex> lock(queue_mutex);
                 message_queue.push(value);
             }
