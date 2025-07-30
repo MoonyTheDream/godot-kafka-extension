@@ -2,12 +2,3 @@
 	path = godot-cpp
 	url = https://github.com/godotengine/godot-cpp.git
 	branch = 4.4
-[submodule "modern-cpp-kafka"]
-	path = modern-cpp-kafka
-	url = https://github.com/morganstanley/modern-cpp-kafka.git
-[submodule "thirdparty/modern-cpp-kafka"]
-	path = thirdparty/modern-cpp-kafka
-	url = https://github.com/morganstanley/modern-cpp-kafka.git
-[submodule "thirdparty/librdkafka"]
-	path = thirdparty/librdkafka
-	url = https://github.com/confluentinc/librdkafka.git
