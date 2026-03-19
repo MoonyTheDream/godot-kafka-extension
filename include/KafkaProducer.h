@@ -27,6 +27,7 @@ public:
     void set_topic(const String &topic);
     void set_security_protocol(const String &protocol);
     void set_ssl_ca_location(const String &path);
+    void connect_to_broker();
     void send_message(const String &message);
 
     KafkaProducer();

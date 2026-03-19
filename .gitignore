@@ -6,6 +6,7 @@
 *.lo
 *.o
 *.obj
+*.os
 
 # Precompiled Headers
 *.gch
@@ -14,19 +15,26 @@
 # Compiled Dynamic libraries
 *.so
 *.dylib
-# *.dll
-
-# Fortran module files
-*.mod
-*.smod
+*.dll
 
 # Compiled Static libraries
 *.lai
 *.la
 *.a
-# *.lib
+*.lib
+
+# Windows linker artifacts
+*.exp
 
 # Executables
 *.exe
 *.out
 *.app
+
+# SCons
+.sconsign.dblite
+.sconsign*
+
+# librdkafka build artifacts
+thirdparty/librdkafka/build/
+thirdparty/librdkafka/install/

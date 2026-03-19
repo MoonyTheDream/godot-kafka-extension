@@ -1,128 +1,142 @@
 # godot-kafka-extension
+
+A Godot GDExtension that adds Apache Kafka producer and consumer support to Godot 4.6+.
+
+## Prerequisites
+
+- **Godot 4.6+**
+- **SCons** (Python build tool)
+- **CMake** (for auto-building librdkafka)
+- **C++ compiler** with C++17 support (MSVC on Windows, GCC/Clang on Linux)
+
+## Building
+
+Clone with submodules:
+
+```sh
+git clone --recursive https://github.com/MoonyTheDream/godot-kafka-extension.git
+cd godot-kafka-extension
+```
+
+Build the extension (librdkafka is built automatically on first run):
+
+```sh
+# Windows
+scons platform=windows target=template_debug
+
+# Linux
+scons platform=linux target=template_debug
+
+# Release build
+scons platform=windows target=template_release
+```
+
+The built library and required runtime DLLs are placed in `demo/kafkaextensionstest/bin/`.
+
 ## Usage
 
 ### Producer
-Creating a producer:
-`producer = KafkaProducer.new()`
 
-Setting up the producer:
-`producer.set_bootstrap_servers(<string>)`
-`producer.set_topic(<string>)`
+```gdscript
+var producer = KafkaProducer.new()
 
-Producing a message:
-`producer.send_message(<string>)`
+func _ready():
+    producer.set_bootstrap_servers("localhost:9092")
+    producer.set_topic("my-topic")
+    producer.producer_ready.connect(_on_ready)
+    producer.producer_error.connect(_on_error)
+    producer.connect_to_broker()
+
+func _on_ready():
+    producer.send_message("Hello Kafka!")
+
+func _on_error(msg: String):
+    printerr("Producer error: ", msg)
+```
+
+**Methods:**
+| Method | Description |
+|---|---|
+| `set_bootstrap_servers(servers: String)` | Set broker address(es) |
+| `set_topic(topic: String)` | Set the target topic |
+| `connect_to_broker()` | Connect to the Kafka broker |
+| `send_message(message: String)` | Send a message (must call `connect_to_broker()` first) |
+| `set_security_protocol(protocol: String)` | Set security protocol (e.g. `"SSL"`) |
+| `set_ssl_ca_location(path: String)` | Set path to CA certificate file |
+
+**Signals:**
+| Signal | Description |
+|---|---|
+| `producer_ready` | Emitted after successful connection |
+| `producer_error(message: String)` | Emitted on connection or send failure |
 
 ### Consumer
-Creating a consumer:
-`consumer = KafkaConsumer.new()`
 
-Setting up the consumer:
-`consumer.set_bootstrap_servers(<string>)`
-`consumer.set_topic(<string>)`
+```gdscript
+var consumer = KafkaConsumer.new()
 
-Starting the consumer:
-`consumer.start()`
+func _ready():
+    consumer.set_bootstrap_servers("localhost:9092")
+    consumer.set_topic("my-topic")
+    consumer.set_group_id("my-group")
+    consumer.consumer_ready.connect(_on_ready)
+    consumer.consumer_error.connect(_on_error)
+    consumer.start()
 
-Linking consumer messages to a signal (probably in _process()):
+func _process(_delta):
+    while consumer.has_message():
+        print(consumer.get_message())
+
+func _on_ready():
+    print("Consumer subscribed")
+
+func _on_error(msg: String):
+    printerr("Consumer error: ", msg)
+```
+
+**Methods:**
+| Method | Description |
+|---|---|
+| `set_bootstrap_servers(servers: String)` | Set broker address(es) |
+| `set_topic(topic: String)` | Set the topic to consume |
+| `set_group_id(id: String)` | Set consumer group ID (for offset tracking) |
+| `start()` | Start consuming in a background thread |
+| `stop()` | Stop consuming |
+| `has_message() -> bool` | Check if messages are queued |
+| `get_message() -> String` | Pop the next message from the queue |
+| `is_running() -> bool` | Check if consumer is active |
+| `change_topic(new_topic: String)` | Switch topic while running |
+| `set_max_queue_size(size: int)` | Set max queued messages (default: 10000) |
+| `set_security_protocol(protocol: String)` | Set security protocol |
+| `set_ssl_ca_location(path: String)` | Set path to CA certificate file |
+
+**Signals:**
+| Signal | Description |
+|---|---|
+| `consumer_ready` | Emitted after successful subscription |
+| `consumer_error(message: String)` | Emitted on connection or polling failure |
+
+## SSL/TLS
+
+To connect to a Kafka broker over SSL:
+
+```gdscript
+producer.set_security_protocol("SSL")
+producer.set_ssl_ca_location("/path/to/cacert.pem")
+producer.connect_to_broker()
+```
+
+**Windows note:** librdkafka on Windows does not use the system certificate store. You must provide an explicit CA certificate file. Download one from https://curl.se/ca/cacert.pem and pass the path via `set_ssl_ca_location()`.
+
+**Linux note:** If `set_ssl_ca_location()` is not called, librdkafka uses the system CA bundle automatically.
 
 ## Updating to a newer Godot version
 
-Steps to upgrade from one Godot version to another (e.g. 4.4 → 4.6):
+1. In `.gitmodules`, the godot-cpp submodule tracks `master`. Just pass the target API version when building:
+   ```sh
+   scons api_version=4.6
+   ```
 
-**1. Update the `godot-cpp` submodule**
+2. Update `compatibility_minimum` in `demo/kafkaextensionstest/KafkaExtension.gdextension` to match.
 
-In `.gitmodules`, change the `branch` field to match the target Godot version:
-```
-[submodule "godot-cpp"]
-    path = godot-cpp
-    url = https://github.com/godotengine/godot-cpp.git
-    branch = 4.6   # <-- change this
-```
-
-Then pull the new version:
-```sh
-cd godot-cpp
-git fetch
-git checkout 4.6   # match the branch above
-cd ..
-git add godot-cpp .gitmodules
-git commit -m "Bump godot-cpp to 4.6"
-```
-
-**2. Update `compatibility_minimum` in the `.gdextension` file**
-
-In [demo/kafkaextensionstest/KafkaExtension.gdextension](demo/kafkaextensionstest/KafkaExtension.gdextension), change:
-```ini
-compatibility_minimum = "4.6"
-```
-
-**3. Rebuild the extension**
-
-```sh
-scons api_version=4.6
-```
-
-**4. Verify the extension loads in the new Godot version**
-
-Open the demo project in the target version of the Godot editor and confirm there are no errors in the output log.
-
-
----
-
-## Step 1 — C++ extension: add SSL methods
-
-Repo: https://github.com/MoonyTheDream/godot-kafka-extension
-
-Both `KafkaProducer` and `KafkaConsumer` need **identical** changes.
-
-### KafkaProducer.h / KafkaConsumer.h — add private members + public declarations
-```cpp
-private:
-    String security_protocol = "";
-    String ssl_ca_location = "";  // empty = use system CA bundle (Linux/Mac)
-
-public:
-    void set_security_protocol(const String &protocol);
-    void set_ssl_ca_location(const String &path);
-```
-
-### KafkaProducer.cpp / KafkaConsumer.cpp — implement setters
-```cpp
-void KafkaProducer::set_security_protocol(const String &protocol) {
-    security_protocol = protocol;
-}
-void KafkaProducer::set_ssl_ca_location(const String &path) {
-    ssl_ca_location = path;
-}
-```
-
-Apply to rdkafka conf **before `rd_kafka_new`** (in the lazy-init / `start()` block):
-```cpp
-if (!security_protocol.is_empty()) {
-    conf->set("security.protocol",
-              std::string(security_protocol.utf8().get_data()), errstr);
-}
-if (!ssl_ca_location.is_empty()) {
-    conf->set("ssl.ca.location",
-              std::string(ssl_ca_location.utf8().get_data()), errstr);
-}
-// Let's Encrypt → hostname verification works → do NOT disable it
-```
-
-### register_types.cpp — bind methods (×2, once per class)
-```cpp
-ClassDB::bind_method(D_METHOD("set_security_protocol", "protocol"),
-                     &KafkaProducer::set_security_protocol);
-ClassDB::bind_method(D_METHOD("set_ssl_ca_location", "path"),
-                     &KafkaProducer::set_ssl_ca_location);
-// Repeat for KafkaConsumer
-```
-
-After changes: **rebuild Linux `.so` + Windows `.dll`**, copy into `morphoLogicClient/bin/`.
-
-**Windows clients:** librdkafka on Windows doesn't use the system cert store.
-- Download `cacert.pem` from https://curl.se/ca/cacert.pem
-- Save as `morphoLogicClient/cacert.pem`
-- Windows clients set `sslCaLocation = "res://cacert.pem"` in their config
-
----
+3. Rebuild and verify in the Godot editor.

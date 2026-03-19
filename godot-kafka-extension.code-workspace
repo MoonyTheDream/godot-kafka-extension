@@ -5,7 +5,9 @@
 		}
 	],
 	"settings": {
-		"godotTools.editorPath.godot4": "/home/moony/Godot/Godot_v4.6.1-stable_linux.x86_64",
+		// "godotTools.editorPath.godot4": "/home/moony/Godot/Godot_v4.6.1-stable_linux.x86_64",
+		"godotTools.editorPath.godot4": "d:\\SteamLibrary\\steamapps\\common\\Godot Engine\\godot.windows.opt.tools.64.exe",
+
 		"files.associations": {
 			"*.log": "log",
 			"array": "cpp",

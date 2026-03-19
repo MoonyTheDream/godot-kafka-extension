@@ -22,13 +22,15 @@ private:
     std::string pending_topic;
     std::string security_protocol;
     std::string ssl_ca_location;
-    bool topic_changed = false;
-    std::atomic<bool> running;
+    std::string group_id;
+    std::atomic<bool> running{false};
+    std::atomic<bool> topic_change_requested{false};
     std::thread consumer_thread;
     std::queue<String> message_queue;
     std::mutex queue_mutex;
+    size_t max_queue_size = 10000;
 
-    void _consume_loop();  // Thread entry point
+    void _consume_loop();
 
 public:
     static void _bind_methods();
@@ -37,6 +39,8 @@ public:
     void set_topic(const String &topic);
     void set_security_protocol(const String &protocol);
     void set_ssl_ca_location(const String &path);
+    void set_group_id(const String &id);
+    void set_max_queue_size(int size);
     void change_topic(const String &new_topic);
     void start();
     void stop();

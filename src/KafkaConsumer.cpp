@@ -1,13 +1,22 @@
 // src/KafkaConsumer.cpp
 #include "KafkaConsumer.h"
+#include <godot_cpp/variant/utility_functions.hpp>
+
 using namespace godot;
 
-// Bind GDScript methods
 void KafkaConsumer::_bind_methods() {
     ClassDB::bind_method(D_METHOD("set_bootstrap_servers", "servers"),
                          &KafkaConsumer::set_bootstrap_servers);
     ClassDB::bind_method(D_METHOD("set_topic", "topic"),
                          &KafkaConsumer::set_topic);
+    ClassDB::bind_method(D_METHOD("set_security_protocol", "protocol"),
+                         &KafkaConsumer::set_security_protocol);
+    ClassDB::bind_method(D_METHOD("set_ssl_ca_location", "path"),
+                         &KafkaConsumer::set_ssl_ca_location);
+    ClassDB::bind_method(D_METHOD("set_group_id", "id"),
+                         &KafkaConsumer::set_group_id);
+    ClassDB::bind_method(D_METHOD("set_max_queue_size", "size"),
+                         &KafkaConsumer::set_max_queue_size);
     ClassDB::bind_method(D_METHOD("change_topic", "new_topic"),
                          &KafkaConsumer::change_topic);
     ClassDB::bind_method(D_METHOD("start"),
@@ -20,15 +29,14 @@ void KafkaConsumer::_bind_methods() {
                          &KafkaConsumer::get_message);
     ClassDB::bind_method(D_METHOD("is_running"),
                          &KafkaConsumer::is_running);
-    ClassDB::bind_method(D_METHOD("set_security_protocol", "protocol"),
-                         &KafkaConsumer::set_security_protocol);
-    ClassDB::bind_method(D_METHOD("set_ssl_ca_location", "path"),
-                         &KafkaConsumer::set_ssl_ca_location);
 
     ADD_SIGNAL(MethodInfo("consumer_ready"));
+    ADD_SIGNAL(MethodInfo("consumer_error",
+        PropertyInfo(Variant::STRING, "message")));
 }
 
-KafkaConsumer::KafkaConsumer() : running(false) { }
+KafkaConsumer::KafkaConsumer() { }
+
 KafkaConsumer::~KafkaConsumer() {
     stop();
 }
@@ -36,6 +44,7 @@ KafkaConsumer::~KafkaConsumer() {
 void KafkaConsumer::set_bootstrap_servers(const String &servers) {
     brokers = servers.utf8().get_data();
 }
+
 void KafkaConsumer::set_topic(const String &t) {
     topic = t.utf8().get_data();
 }
@@ -43,34 +52,44 @@ void KafkaConsumer::set_topic(const String &t) {
 void KafkaConsumer::set_security_protocol(const String &protocol) {
     security_protocol = protocol.utf8().get_data();
 }
+
 void KafkaConsumer::set_ssl_ca_location(const String &path) {
     ssl_ca_location = path.utf8().get_data();
 }
 
-bool KafkaConsumer::is_running() {
-    return running;
+void KafkaConsumer::set_group_id(const String &id) {
+    group_id = id.utf8().get_data();
+}
+
+void KafkaConsumer::set_max_queue_size(int size) {
+    if (size > 0) {
+        max_queue_size = static_cast<size_t>(size);
+    }
 }
 
 void KafkaConsumer::change_topic(const String &new_topic) {
     std::lock_guard<std::mutex> lock(queue_mutex);
     pending_topic = new_topic.utf8().get_data();
-    topic_changed = true;
+    topic_change_requested.store(true);
 }
 
 void KafkaConsumer::start() {
-    if (running) {
+    if (running.load()) {
         return;
     }
-    // running = true;
-    // Launch background thread for polling
+    running.store(true);
     consumer_thread = std::thread(&KafkaConsumer::_consume_loop, this);
 }
 
 void KafkaConsumer::stop() {
-    running = false;
+    running.store(false);
     if (consumer_thread.joinable()) {
         consumer_thread.join();
     }
+}
+
+bool KafkaConsumer::is_running() {
+    return running.load();
 }
 
 bool KafkaConsumer::has_message() {
@@ -89,46 +108,47 @@ String KafkaConsumer::get_message() {
 }
 
 void KafkaConsumer::_consume_loop() {
-    kafka::Properties props({ {"bootstrap.servers", {brokers}} });
-    if (!security_protocol.empty()) props.put("security.protocol", security_protocol);
-    if (!ssl_ca_location.empty())   props.put("ssl.ca.location", ssl_ca_location);
+    try {
+        kafka::Properties props({{"bootstrap.servers", brokers}});
+        if (!security_protocol.empty()) props.put("security.protocol", security_protocol);
+        if (!ssl_ca_location.empty()) props.put("ssl.ca.location", ssl_ca_location);
+        if (!group_id.empty()) props.put("group.id", group_id);
 
-    kafka::clients::consumer::KafkaConsumer consumer(props);
+        kafka::clients::consumer::KafkaConsumer consumer(props);
+        consumer.subscribe({topic});
+        call_deferred("emit_signal", "consumer_ready");
 
-    consumer.subscribe({ topic });
+        while (running.load()) {
+            if (topic_change_requested.load()) {
+                std::string new_topic;
+                {
+                    std::lock_guard<std::mutex> lock(queue_mutex);
+                    new_topic = pending_topic;
+                }
+                consumer.unsubscribe();
+                consumer.subscribe({new_topic});
+                topic = new_topic;
+                topic_change_requested.store(false);
+                call_deferred("emit_signal", "consumer_ready");
+            }
 
-    // Let's wait additional 10ms
-    std::this_thread::sleep_for(std::chrono::milliseconds(150));
-    call_deferred("emit_signal", "consumer_ready");
-    print_line("KafkaConsumer starting _consume_loop on topic: " + String(topic.c_str()));
-    running = true;
-
-    while (running) {
-        if (topic_changed) {
-            running = false;
-            consumer.unsubscribe();
-            consumer.subscribe({ pending_topic });
-            topic = pending_topic;
-            std::this_thread::sleep_for(std::chrono::milliseconds(150));
-            topic_changed = false;
-            call_deferred("emit_signal", "consumer_ready");
-            print_line("KafkaConsumer switched to topic: " + String(topic.c_str()));
-            running = true; 
-        }
-
-        auto records = consumer.poll(std::chrono::milliseconds(10));
-        for (const auto &record : records) {
-            if (!record.error()) {
-                const auto value_view = record.value();  // kafka::Value is a ByteArray-like view
-
-                const char* raw_ptr = static_cast<const char*>(value_view.data());
-                String value = String::utf8(raw_ptr, value_view.size());
-
-                std::lock_guard<std::mutex> lock(queue_mutex);
-                message_queue.push(value);
+            auto records = consumer.poll(std::chrono::milliseconds(100));
+            for (const auto &record : records) {
+                if (!record.error()) {
+                    const auto value_view = record.value();
+                    String value = String::utf8(
+                        static_cast<const char *>(value_view.data()),
+                        value_view.size());
+                    std::lock_guard<std::mutex> lock(queue_mutex);
+                    if (message_queue.size() < max_queue_size) {
+                        message_queue.push(value);
+                    }
+                }
             }
         }
+        consumer.close();
+    } catch (const kafka::KafkaException &e) {
+        call_deferred("emit_signal", "consumer_error", String(e.what()));
+        running.store(false);
     }
-    consumer.close();
 }
-
