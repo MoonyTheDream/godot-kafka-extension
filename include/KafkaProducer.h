@@ -16,6 +16,8 @@ class KafkaProducer : public RefCounted {
 private:
     std::string brokers;
     std::string topic;
+    std::string security_protocol;
+    std::string ssl_ca_location;
     std::unique_ptr<kafka::clients::producer::KafkaProducer> producer;
 
 public:
@@ -23,6 +25,8 @@ public:
 
     void set_bootstrap_servers(const String &servers);
     void set_topic(const String &topic);
+    void set_security_protocol(const String &protocol);
+    void set_ssl_ca_location(const String &path);
     void send_message(const String &message);
 
     KafkaProducer();

@@ -20,6 +20,8 @@ private:
     std::string brokers;
     std::string topic;
     std::string pending_topic;
+    std::string security_protocol;
+    std::string ssl_ca_location;
     bool topic_changed = false;
     std::atomic<bool> running;
     std::thread consumer_thread;
@@ -33,6 +35,8 @@ public:
 
     void set_bootstrap_servers(const String &servers);
     void set_topic(const String &topic);
+    void set_security_protocol(const String &protocol);
+    void set_ssl_ca_location(const String &path);
     void change_topic(const String &new_topic);
     void start();
     void stop();

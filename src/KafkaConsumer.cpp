@@ -20,6 +20,10 @@ void KafkaConsumer::_bind_methods() {
                          &KafkaConsumer::get_message);
     ClassDB::bind_method(D_METHOD("is_running"),
                          &KafkaConsumer::is_running);
+    ClassDB::bind_method(D_METHOD("set_security_protocol", "protocol"),
+                         &KafkaConsumer::set_security_protocol);
+    ClassDB::bind_method(D_METHOD("set_ssl_ca_location", "path"),
+                         &KafkaConsumer::set_ssl_ca_location);
 
     ADD_SIGNAL(MethodInfo("consumer_ready"));
 }
@@ -34,6 +38,13 @@ void KafkaConsumer::set_bootstrap_servers(const String &servers) {
 }
 void KafkaConsumer::set_topic(const String &t) {
     topic = t.utf8().get_data();
+}
+
+void KafkaConsumer::set_security_protocol(const String &protocol) {
+    security_protocol = protocol.utf8().get_data();
+}
+void KafkaConsumer::set_ssl_ca_location(const String &path) {
+    ssl_ca_location = path.utf8().get_data();
 }
 
 bool KafkaConsumer::is_running() {
@@ -79,8 +90,8 @@ String KafkaConsumer::get_message() {
 
 void KafkaConsumer::_consume_loop() {
     kafka::Properties props({ {"bootstrap.servers", {brokers}} });
-    // props.put("fetch.min.bytes", "1");
-    // props.put("fetch.wait.max.ms", "10");
+    if (!security_protocol.empty()) props.put("security.protocol", security_protocol);
+    if (!ssl_ca_location.empty())   props.put("ssl.ca.location", ssl_ca_location);
 
     kafka::clients::consumer::KafkaConsumer consumer(props);
 
