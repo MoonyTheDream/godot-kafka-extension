@@ -140,3 +140,34 @@ producer.connect_to_broker()
 2. Update `compatibility_minimum` in `demo/kafkaextensionstest/KafkaExtension.gdextension` to match.
 
 3. Rebuild and verify in the Godot editor.
+
+
+# Correcting for Windows
+
+Install OpenSSL for Windows (MSVC-compatible, not MinGW):
+
+winget install FireDaemon.OpenSSL
+This installs to C:\Program Files\FireDaemon-OpenSSL-3 with the .lib files CMake needs.
+Alternatively, download the Win64 installer directly from: https://slproweb.com/products/Win32OpenSSL.html
+
+Clean and rebuild librdkafka:
+
+cd libs/godot-kafka-extension
+rm -rf thirdparty/librdkafka/build thirdparty/librdkafka/install
+Update SConstruct to point CMake to OpenSSL on Windows:
+
+File: libs/godot-kafka-extension/SConstruct (lines 22-24)
+
+if env['platform'] == 'windows':
+    cmake_args += ['-A', 'x64']
+    openssl_root = os.environ.get('OPENSSL_ROOT_DIR', r'C:\Program Files\OpenSSL-Win64')
+    if os.path.exists(openssl_root):
+        cmake_args += [f'-DOPENSSL_ROOT_DIR={openssl_root}']
+Rebuild everything:
+
+git submodule update --init --recursive
+scons platform=windows target=template_debug
+Copy new DLLs to morphoLogicClient/bin/:
+
+rdkafka.dll (now linking OpenSSL)
+libssl-3-x64.dll and libcrypto-3-x64.dll (OpenSSL runtime)

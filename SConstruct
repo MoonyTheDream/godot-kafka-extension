@@ -19,9 +19,22 @@ if not os.path.exists(os.path.join(rdkafka_install, 'include', 'librdkafka', 'rd
     cmake_args = [
         'cmake', '-S', rdkafka_src, '-B', rdkafka_build,
         '-DRDKAFKA_BUILD_STATIC=OFF', '-DWITH_SSL=ON',
+        '-DRDKAFKA_BUILD_TESTS=OFF', '-DRDKAFKA_BUILD_EXAMPLES=OFF',
     ]
     if env['platform'] == 'windows':
         cmake_args += ['-A', 'x64']
+        # Auto-detect OpenSSL; override with OPENSSL_ROOT_DIR env var
+        openssl_candidates = [
+            os.environ.get('OPENSSL_ROOT_DIR', ''),
+            r'C:\Program Files\FireDaemon-OpenSSL-3',
+            r'C:\Program Files\OpenSSL-Win64',
+            r'C:\Program Files\OpenSSL',
+        ]
+        for candidate in openssl_candidates:
+            if candidate and os.path.exists(os.path.join(candidate, 'include', 'openssl', 'ssl.h')):
+                cmake_args += [f'-DOPENSSL_ROOT_DIR={candidate}']
+                print(f'=== Using OpenSSL from: {candidate} ===')
+                break
     subprocess.check_call(cmake_args)
     subprocess.check_call(['cmake', '--build', rdkafka_build, '--config', 'Release'])
     subprocess.check_call(['cmake', '--install', rdkafka_build,
