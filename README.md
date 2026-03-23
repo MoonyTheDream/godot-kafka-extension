@@ -8,6 +8,7 @@ A Godot GDExtension that adds Apache Kafka producer and consumer support to Godo
 - **SCons** (Python build tool)
 - **CMake** (for auto-building librdkafka)
 - **C++ compiler** with C++17 support (MSVC on Windows, GCC/Clang on Linux)
+- `sudo apt install libssl-dev` on linux
 
 ## Building
 
@@ -18,6 +19,12 @@ git clone --recursive https://github.com/MoonyTheDream/godot-kafka-extension.git
 cd godot-kafka-extension
 ```
 
+Optionally
+
+```sh
+git submodule update --init --recursive
+```
+
 Build the extension (librdkafka is built automatically on first run):
 
 ```sh
@@ -25,7 +32,7 @@ Build the extension (librdkafka is built automatically on first run):
 scons platform=windows target=template_debug
 
 # Linux
-scons platform=linux target=template_debug
+scons platform=linux target=template_debug api_version=4.6
 
 # Release build
 scons platform=windows target=template_release
